@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import authService from '../services/authService';
 import { User, CreateUserInput } from '../../shared/types/database';
 
