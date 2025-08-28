@@ -150,55 +150,29 @@ class AuthService {
 
   // Create demo users in Supabase Auth
   async createDemoUsers(): Promise<void> {
-    console.log('Creating demo users in Supabase Auth...');
-    
-    for (const [role, credentials] of Object.entries(this.DEMO_CREDENTIALS)) {
-      try {
-        // Check if user already exists in our users table
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id, email')
-          .eq('email', credentials.email)
-          .single();
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-demo-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
 
-        if (existingUser) {
-          console.log(`Demo ${role} user already exists:`, credentials.email);
-          continue;
-        }
-
-        // Create auth user
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: credentials.email,
-          password: credentials.password,
-          email_confirm: true,
-          user_metadata: {
-            first_name: 'Demo',
-            last_name: role.charAt(0).toUpperCase() + role.slice(1),
-            user_type: role
-          }
-        });
-
-        if (authError) {
-          console.error(`Failed to create demo ${role} auth user:`, authError);
-          continue;
-        }
-
-        if (authData.user) {
-          // Update the users table with the correct auth user ID
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({ id: authData.user.id })
-            .eq('email', credentials.email);
-
-          if (updateError) {
-            console.error(`Failed to update demo ${role} user ID:`, updateError);
-          } else {
-            console.log(`Demo ${role} user created successfully:`, credentials.email);
-          }
-        }
-      } catch (error) {
-        console.error(`Error creating demo ${role} user:`, error);
+      if (!response.ok) {
+        throw new Error(`Failed to create demo users: ${response.statusText}`);
       }
+
+      const result = await response.json();
+      console.log('Demo users creation result:', result);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create demo users');
+      }
+    } catch (error) {
+      console.error('Error creating demo users:', error);
+      throw error;
     }
   }
 

@@ -164,6 +164,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }, 100);
         
         return { success: true };
+        
+        // Immediate redirection after successful login
+        const dashboardPath = authService.getDashboardPath(result.user);
+        console.log('Redirecting to:', dashboardPath);
+        navigate(dashboardPath, { replace: true });
       }
 
       return { success: false, error: 'Login failed' };

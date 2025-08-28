@@ -107,9 +107,7 @@ export default function Auth() {
         const result = await register(userData);
         if (result.success) {
           setSuccess('Account created successfully! Redirecting...');
-          setTimeout(() => {
-            redirectToDashboard(userData.userType);
-          }, 1500);
+          // Redirection is handled automatically by AuthContext
         } else {
           setError(result.error || 'Registration failed. Please try again.');
         }
@@ -117,7 +115,7 @@ export default function Auth() {
         const result = await login(formData.email, formData.password);
         if (result.success) {
           setSuccess('Login successful! Redirecting...');
-          // Don't need additional redirect here as AuthContext handles it
+          // Redirection is handled automatically by AuthContext
         } else {
           setError(result.error || 'Login failed. Please check your credentials.');
         }
@@ -134,11 +132,6 @@ export default function Auth() {
     const credentials = DEMO_CREDENTIALS[role];
     setError('');
     setSuccess('');
-    setFormData(prev => ({
-      ...prev,
-      email: credentials.email,
-      password: credentials.password
-    }));
     
     setIsLoading(true);
     
@@ -147,9 +140,7 @@ export default function Auth() {
       
       if (result.success) {
         setSuccess(`Demo ${role} login successful! Redirecting...`);
-        setTimeout(() => {
-          redirectToDashboard();
-        }, 1000);
+        // Redirection is handled automatically by AuthContext
       } else {
         setError(result.error || 'Demo login failed');
       }
