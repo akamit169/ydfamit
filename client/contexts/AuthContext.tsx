@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      setIsLoading(true);
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -78,6 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
         } else {
           setUser(userData);
+          console.log('User authenticated:', userData.email, 'Role:', userData.user_type);
         }
       } else {
         setUser(null);

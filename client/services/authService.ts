@@ -9,6 +9,14 @@ export interface AuthResult {
 }
 
 class AuthService {
+  // Demo credentials for testing
+  private readonly DEMO_CREDENTIALS = {
+    student: { email: 'student@demo.com', password: 'student123' },
+    admin: { email: 'admin@demo.com', password: 'admin123' },
+    reviewer: { email: 'reviewer@demo.com', password: 'reviewer123' },
+    donor: { email: 'donor@demo.com', password: 'donor123' }
+  };
+
   // Login with email and password
   async login(email: string, password: string): Promise<AuthResult> {
     try {
@@ -118,8 +126,6 @@ class AuthService {
 
       if (profileError) {
         console.error('Profile creation error:', profileError);
-        // Clean up auth user if profile creation fails
-        await supabase.auth.admin.deleteUser(authData.user.id);
         return { 
           success: false, 
           error: 'Failed to create user profile' 
@@ -139,6 +145,60 @@ class AuthService {
         success: false,
         error: error instanceof Error ? error.message : 'Registration failed'
       };
+    }
+  }
+
+  // Create demo users in Supabase Auth
+  async createDemoUsers(): Promise<void> {
+    console.log('Creating demo users in Supabase Auth...');
+    
+    for (const [role, credentials] of Object.entries(this.DEMO_CREDENTIALS)) {
+      try {
+        // Check if user already exists in our users table
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('email', credentials.email)
+          .single();
+
+        if (existingUser) {
+          console.log(`Demo ${role} user already exists:`, credentials.email);
+          continue;
+        }
+
+        // Create auth user
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: credentials.email,
+          password: credentials.password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: 'Demo',
+            last_name: role.charAt(0).toUpperCase() + role.slice(1),
+            user_type: role
+          }
+        });
+
+        if (authError) {
+          console.error(`Failed to create demo ${role} auth user:`, authError);
+          continue;
+        }
+
+        if (authData.user) {
+          // Update the users table with the correct auth user ID
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ id: authData.user.id })
+            .eq('email', credentials.email);
+
+          if (updateError) {
+            console.error(`Failed to update demo ${role} user ID:`, updateError);
+          } else {
+            console.log(`Demo ${role} user created successfully:`, credentials.email);
+          }
+        }
+      } catch (error) {
+        console.error(`Error creating demo ${role} user:`, error);
+      }
     }
   }
 
@@ -272,6 +332,11 @@ class AuthService {
     }
   }
 
+  // Get demo credentials
+  getDemoCredentials() {
+    return this.DEMO_CREDENTIALS;
+  }
+
   // Convert Supabase errors to user-friendly messages
   private getReadableError(errorMessage: string): string {
     if (errorMessage.includes('Invalid login credentials')) {
@@ -291,53 +356,6 @@ class AuthService {
     }
     
     return errorMessage;
-  }
-
-  // Create demo users (for development)
-  async createDemoUsers(): Promise<void> {
-    const demoUsers = [
-      {
-        email: 'student@demo.com',
-        password: 'student123',
-        firstName: 'Demo',
-        lastName: 'Student',
-        userType: 'student' as const,
-        phone: '+91 9876543210'
-      },
-      {
-        email: 'admin@demo.com',
-        password: 'admin123',
-        firstName: 'Demo',
-        lastName: 'Admin',
-        userType: 'admin' as const,
-        phone: '+91 9876543211'
-      },
-      {
-        email: 'reviewer@demo.com',
-        password: 'reviewer123',
-        firstName: 'Demo',
-        lastName: 'Reviewer',
-        userType: 'reviewer' as const,
-        phone: '+91 9876543212'
-      },
-      {
-        email: 'donor@demo.com',
-        password: 'donor123',
-        firstName: 'Demo',
-        lastName: 'Donor',
-        userType: 'donor' as const,
-        phone: '+91 9876543213'
-      }
-    ];
-
-    for (const user of demoUsers) {
-      try {
-        await this.register(user);
-        console.log(`Created demo user: ${user.email}`);
-      } catch (error) {
-        console.log(`Demo user ${user.email} might already exist`);
-      }
-    }
   }
 }
 

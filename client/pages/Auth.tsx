@@ -9,17 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Separator } from '../components/ui/separator';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import DatabaseStatus from '../components/DatabaseStatus';
+import DemoSetup from '../components/DemoSetup';
 import { useAuth } from '../contexts/AuthContext';
+import authService from '../services/authService';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
-
-// Demo credentials for testing
-const DEMO_CREDENTIALS = {
-  student: { email: 'student@demo.com', password: 'student123' },
-  admin: { email: 'admin@demo.com', password: 'admin123' },
-  reviewer: { email: 'reviewer@demo.com', password: 'reviewer123' },
-  donor: { email: 'donor@demo.com', password: 'donor123' }
-};
 
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -30,6 +24,9 @@ export default function Auth() {
   const [success, setSuccess] = useState('');
   const { login, register, isAuthenticated, redirectToDashboard } = useAuth();
   const navigate = useNavigate();
+
+  // Get demo credentials from auth service
+  const DEMO_CREDENTIALS = authService.getDemoCredentials();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -134,6 +131,8 @@ export default function Auth() {
 
   const handleDemoLogin = async (role: keyof typeof DEMO_CREDENTIALS) => {
     const credentials = DEMO_CREDENTIALS[role];
+    setError('');
+    setSuccess('');
     setFormData(prev => ({
       ...prev,
       email: credentials.email,
@@ -141,14 +140,23 @@ export default function Auth() {
     }));
     
     setIsLoading(true);
-    const result = await login(credentials.email, credentials.password);
     
-    if (result.success) {
-      setSuccess(`Demo ${role} login successful! Redirecting...`);
-    } else {
-      setError(result.error || 'Demo login failed');
+    try {
+      const result = await login(credentials.email, credentials.password);
+      
+      if (result.success) {
+        setSuccess(`Demo ${role} login successful! Redirecting...`);
+        setTimeout(() => {
+          redirectToDashboard();
+        }, 1000);
+      } else {
+        setError(result.error || 'Demo login failed');
+      }
+    } catch (error) {
+      setError('Demo login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleSocialAuth = (provider: string) => {
@@ -189,6 +197,11 @@ export default function Auth() {
         {/* Database Status */}
         <div className="mb-4">
           <DatabaseStatus />
+        </div>
+
+        {/* Demo Setup */}
+        <div className="mb-4">
+          <DemoSetup />
         </div>
 
         {/* Demo Credentials */}

@@ -13,6 +13,7 @@ import {
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { useAuth } from '../contexts/AuthContext';
+import authService from '../services/authService';
 
 interface DemoUser {
   role: string;
@@ -28,13 +29,16 @@ interface DemoUser {
 const LoginDemo = () => {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [copiedCredential, setCopiedCredential] = useState<string | null>(null);
-  const { login } = useAuth();
+  const { login, redirectToDashboard } = useAuth();
+
+  // Get demo credentials from auth service
+  const DEMO_CREDENTIALS = authService.getDemoCredentials();
 
   const demoUsers: DemoUser[] = [
     {
       role: 'student',
-      email: 'student@demo.com',
-      password: 'student123',
+      email: DEMO_CREDENTIALS.student.email,
+      password: DEMO_CREDENTIALS.student.password,
       name: 'Demo Student',
       description: 'Apply for scholarships and track progress',
       icon: GraduationCap,
@@ -43,8 +47,8 @@ const LoginDemo = () => {
     },
     {
       role: 'admin',
-      email: 'admin@demo.com', 
-      password: 'admin123',
+      email: DEMO_CREDENTIALS.admin.email,
+      password: DEMO_CREDENTIALS.admin.password,
       name: 'Demo Administrator',
       description: 'Manage programs and oversee operations',
       icon: Shield,
@@ -53,8 +57,8 @@ const LoginDemo = () => {
     },
     {
       role: 'reviewer',
-      email: 'reviewer@demo.com',
-      password: 'reviewer123', 
+      email: DEMO_CREDENTIALS.reviewer.email,
+      password: DEMO_CREDENTIALS.reviewer.password,
       name: 'Demo Reviewer',
       description: 'Evaluate applications and score candidates',
       icon: Users,
@@ -63,8 +67,8 @@ const LoginDemo = () => {
     },
     {
       role: 'donor',
-      email: 'donor@demo.com',
-      password: 'donor123',
+      email: DEMO_CREDENTIALS.donor.email,
+      password: DEMO_CREDENTIALS.donor.password,
       name: 'Demo Donor',
       description: 'Fund scholarships and track impact',
       icon: Heart,
@@ -78,9 +82,12 @@ const LoginDemo = () => {
     
     try {
       const result = await login(user.email, user.password);
-      if (!result.success) {
+      if (result.success) {
+        setTimeout(() => {
+          redirectToDashboard();
+        }, 1000);
+      } else {
         console.error('Demo login failed:', result.error);
-        // If demo user doesn't exist, we could create it here
       }
     } catch (error) {
       console.error('Demo login error:', error);
@@ -156,7 +163,7 @@ const LoginDemo = () => {
                         {copiedCredential === `${user.role}-email` ? (
                           <CheckCircle className="h-3 w-3 text-green-500" />
                         ) : (
-                          <Copy className="h-3 w-3" />
+                          <Copy className="h-3 w-3 text-gray-400" />
                         )}
                       </Button>
                     </div>
@@ -174,7 +181,7 @@ const LoginDemo = () => {
                         {copiedCredential === `${user.role}-password` ? (
                           <CheckCircle className="h-3 w-3 text-green-500" />
                         ) : (
-                          <Copy className="h-3 w-3" />
+                          <Copy className="h-3 w-3 text-gray-400" />
                         )}
                       </Button>
                     </div>
