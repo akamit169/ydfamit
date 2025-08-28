@@ -55,8 +55,8 @@ class AuthService {
         console.error('User profile error:', userError);
         
         // If RLS error, try to create profile from auth metadata
-        if (userError.code === '42P17' || userError.message.includes('infinite recursion')) {
-          console.log('RLS error detected, attempting to create profile from auth metadata');
+        if (userError.code === '42P17' || userError.code === 'PGRST116' || userError.message.includes('infinite recursion')) {
+          console.log('User profile not found or RLS error detected, attempting to create profile from auth metadata');
           
           const userMetadata = data.user.user_metadata;
           if (userMetadata && userMetadata.user_type) {
