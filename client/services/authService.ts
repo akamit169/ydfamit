@@ -263,10 +263,12 @@ class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User | null> {
     try {
+      // First check if we have an authenticated session
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return null;
 
+      // Try to get user profile with better error handling
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
@@ -275,6 +277,13 @@ class AuthService {
 
       if (error) {
         console.error('Get current user error:', error);
+        
+        // If it's a permission error, the user might not have a profile yet
+        if (error.code === '42501' || error.message.includes('permission denied')) {
+          console.log('Permission denied - user profile may not exist yet');
+          return null;
+        }
+        
         return null;
       }
 

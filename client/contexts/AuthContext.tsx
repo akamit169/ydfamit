@@ -26,8 +26,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Check if we have a session first
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          setIsLoading(false);
+          return;
+        }
+        
         const currentUser = await authService.getCurrentUser();
-        setUser(currentUser);
+        
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          // If we have a session but no user profile, sign out
+          console.log('Session exists but no user profile found, signing out');
+          await supabase.auth.signOut();
+        }
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {
