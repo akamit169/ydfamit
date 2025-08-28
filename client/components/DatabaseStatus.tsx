@@ -2,18 +2,25 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
-import { supabase } from '../lib/supabase';
 
 export const DatabaseStatus = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkConnection = async () => {
+    const checkConnection = () => {
       try {
-        await supabaseService.testConnection();
-        setIsConnected(true);
+        // Simple check for environment variables
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (supabaseUrl && supabaseKey && supabaseUrl.includes('supabase.co')) {
+          setIsConnected(true);
+        } else {
+          setIsConnected(false);
+        }
       } catch (error) {
+        console.error('Connection check error:', error);
         setIsConnected(false);
       } finally {
         setIsLoading(false);
