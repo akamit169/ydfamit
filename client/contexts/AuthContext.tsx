@@ -111,10 +111,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (!error && userData) {
             setUser(userData);
+            console.log('Setting user and redirecting:', userData.user_type);
             // Auto-redirect on successful sign in
-            if (window.location.pathname === '/auth' || window.location.pathname === '/') {
+            setTimeout(() => {
               redirectToDashboard(userData.user_type);
-            }
+            }, 100);
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -126,10 +127,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.log('Attempting login for:', email);
       setIsLoading(true);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -142,38 +144,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: error.message };
       }
 
-      if (data.user) {
-        // Get user profile
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (userError) {
-          console.error('User profile error:', userError);
-          return { success: false, error: 'Failed to load user profile' };
-        }
-
-        console.log('Login successful, user role:', userData.user_type);
-        setUser(userData);
-        
-        // Immediate redirection after successful login
-        setTimeout(() => {
-          redirectToDashboard(userData.user_type);
-        }, 100);
-        
-        return { success: true };
-        
-        // Immediate redirection after successful login
-        const dashboardPath = authService.getDashboardPath(result.user);
-        console.log('Redirecting to:', dashboardPath);
-        navigate(dashboardPath, { replace: true });
+      if (!data.user) {
+        return { success: false, error: 'Login failed - no user data' };
       }
 
-      return { success: false, error: 'Login failed' };
+      console.log('Auth login successful, getting user profile...');
+      
+      // The auth state change listener will handle the redirection
+      return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login exception:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Login failed' 
@@ -189,7 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email,
+        email: userData.email.trim().toLowerCase(),
         password: userData.password,
         options: {
           data: {
@@ -214,7 +194,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .from('users')
         .insert({
           id: authData.user.id,
-          email: userData.email,
+          email: userData.email.trim().toLowerCase(),
           first_name: userData.firstName,
           last_name: userData.lastName,
           phone: userData.phone,
@@ -230,6 +210,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       setUser(profileData);
+      
+      // Redirect after successful registration
+      setTimeout(() => {
+        redirectToDashboard(profileData.user_type);
+      }, 100);
+      
       return { success: true };
     } catch (error) {
       console.error('Register error:', error);
