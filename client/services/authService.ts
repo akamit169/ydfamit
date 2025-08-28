@@ -66,6 +66,58 @@ class AuthService {
         const userMetadata = data.user.user_metadata;
         if (userMetadata && userMetadata.user_type) {
           try {
+            // First check if a profile exists with this email but different ID
+            const { data: existingProfile, error: existingError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', data.user.email || email)
+              .maybeSingle();
+
+            if (existingError) {
+              console.error('Error checking existing profile:', existingError);
+              return { 
+                success: false, 
+                error: 'Failed to check existing user profile' 
+              };
+            }
+
+            // If profile exists with different ID, update the ID to match auth user
+            if (existingProfile && existingProfile.id !== data.user.id) {
+              console.log('Found existing profile with different ID, updating...');
+              const { data: updatedProfile, error: updateError } = await supabase
+                .from('users')
+                .update({ id: data.user.id })
+                .eq('email', data.user.email || email)
+                .select()
+                .single();
+
+              if (updateError) {
+                console.error('Profile update error:', updateError);
+                return { 
+                  success: false, 
+                  error: 'Failed to update user profile' 
+                };
+              }
+
+              console.log('Profile updated successfully');
+              return {
+                success: true,
+                user: updatedProfile,
+                message: 'Login successful'
+              };
+            }
+
+            // If profile exists with same ID, return it
+            if (existingProfile && existingProfile.id === data.user.id) {
+              console.log('Found existing profile with matching ID');
+              return {
+                success: true,
+                user: existingProfile,
+                message: 'Login successful'
+              };
+            }
+
+            // No existing profile found, create new one
             const { data: newProfile, error: createError } = await supabase
               .from('users')
               .insert({
