@@ -319,11 +319,20 @@ class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User | null> {
     try {
+      // Check environment variables first
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.log('Supabase environment variables not configured');
+        return null;
+      }
+
       // First check if we have an authenticated session
       const { data: { user }, error: sessionError } = await supabase.auth.getUser();
       
       if (sessionError) {
-        console.error('Session error:', sessionError);
+        // Don't log network errors as they're expected when Supabase isn't configured
+        if (!sessionError.message.includes('Failed to fetch')) {
+          console.error('Session error:', sessionError);
+        }
         return null;
       }
       
@@ -337,19 +346,28 @@ class AuthService {
         .maybeSingle();
 
       if (error) {
-        console.error('Get current user error:', error);
+        // Don't log PGRST116 errors as they're expected when no profile exists
+        if (error.code !== 'PGRST116') {
+          console.error('Get current user error:', error);
+        }
         return null;
       }
 
       // If no user profile found, return null (don't create here)
       if (!userData) {
-        console.log('No user profile found for authenticated user');
+        // Only log if we have a valid session but no profile
+        if (user) {
+          console.log('No user profile found for authenticated user');
+        }
         return null;
       }
 
       return userData;
     } catch (error) {
-      console.error('Get current user exception:', error);
+      // Only log non-network errors
+      if (error instanceof Error && !error.message.includes('Failed to fetch')) {
+        console.error('Get current user exception:', error);
+      }
       return null;
     }
   }
