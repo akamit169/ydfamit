@@ -256,6 +256,14 @@ class AuthService {
 
   // Create demo users via edge function
   async createDemoUsers(): Promise<{ success: boolean; error?: string; message?: string }> {
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured) {
+      return {
+        success: false,
+        error: 'Supabase is not configured. Please set up your Supabase connection first.'
+      };
+    }
+
     try {
       console.log('Creating demo users via edge function...');
       

@@ -2,26 +2,23 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export const DatabaseStatus = () => {
-  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'not-configured' | 'error'>('checking');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkConnection = () => {
       try {
-        // Simple check for environment variables
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        if (supabaseUrl && supabaseKey && supabaseUrl.includes('supabase.co')) {
-          setIsConnected(true);
+        if (isSupabaseConfigured) {
+          setConnectionStatus('connected');
         } else {
-          setIsConnected(false);
+          setConnectionStatus('not-configured');
         }
       } catch (error) {
         console.error('Connection check error:', error);
-        setIsConnected(false);
+        setConnectionStatus('error');
       } finally {
         setIsLoading(false);
       }
@@ -41,7 +38,7 @@ export const DatabaseStatus = () => {
     );
   }
 
-  if (isConnected) {
+  if (connectionStatus === 'connected') {
     return (
       <Alert className="border-green-200 bg-green-50">
         <CheckCircle className="h-4 w-4 text-green-600" />
