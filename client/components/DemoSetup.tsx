@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -6,7 +6,6 @@ import {
   AlertCircle, 
   Loader2,
   Database,
-  Key,
   Shield
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -18,15 +17,19 @@ const DemoSetup = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [setupStatus, setSetupStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
+  const [results, setResults] = useState<any[]>([]);
 
   const handleCreateDemoUsers = async () => {
     setIsCreating(true);
     setSetupStatus('creating');
     setError('');
+    setResults([]);
 
     try {
+      console.log('Starting demo user creation...');
       await authService.createDemoUsers();
       setSetupStatus('success');
+      console.log('Demo users created successfully');
     } catch (error) {
       console.error('Demo setup error:', error);
       setSetupStatus('error');
@@ -85,7 +88,7 @@ const DemoSetup = () => {
           <Alert className="border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-700">
-              ✅ Demo users created successfully! You can now use the demo login credentials.
+              ✅ Demo users created successfully! You can now use the demo login credentials below.
             </AlertDescription>
           </Alert>
         )}
@@ -95,6 +98,10 @@ const DemoSetup = () => {
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-700">
               ❌ {error}
+              <br />
+              <span className="text-xs mt-1 block">
+                Please try again or check your Supabase connection.
+              </span>
             </AlertDescription>
           </Alert>
         )}
@@ -110,6 +117,9 @@ const DemoSetup = () => {
               </div>
             ))}
           </div>
+          <p className="text-xs text-blue-600 mt-2">
+            Click "Create Demo Users" first, then use these credentials to login.
+          </p>
         </div>
 
         <div className="flex items-center space-x-2 text-xs text-blue-600">

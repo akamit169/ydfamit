@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { User, CreateUserInput, LoginInput } from '../../shared/types/database';
+import { User, CreateUserInput } from '../../shared/types/database';
 
 export interface AuthResult {
   success: boolean;
@@ -28,7 +28,7 @@ class AuthService {
       });
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('Supabase auth error:', error);
         return { 
           success: false, 
           error: this.getReadableError(error.message) 
@@ -118,7 +118,7 @@ class AuthService {
           phone: userData.phone,
           user_type: userData.userType,
           profile_data: userData.profileData || {},
-          email_verified: false,
+          email_verified: true,
           is_active: true
         })
         .select()
@@ -151,6 +151,8 @@ class AuthService {
   // Create demo users in Supabase Auth
   async createDemoUsers(): Promise<void> {
     try {
+      console.log('Creating demo users via edge function...');
+      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-demo-users`, {
         method: 'POST',
         headers: {
@@ -161,7 +163,9 @@ class AuthService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create demo users: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Edge function response error:', errorText);
+        throw new Error(`Failed to create demo users: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
@@ -170,6 +174,8 @@ class AuthService {
       if (!result.success) {
         throw new Error(result.error || 'Failed to create demo users');
       }
+
+      console.log('Demo users created successfully');
     } catch (error) {
       console.error('Error creating demo users:', error);
       throw error;
@@ -335,3 +341,11 @@ class AuthService {
 
 export const authService = new AuthService();
 export default authService;
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

@@ -97,55 +97,49 @@ Deno.serve(async (req: Request) => {
 
     for (const user of demoUsers) {
       try {
-        // Check if user already exists in auth
-        const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserByEmail(user.email);
-        
-        let authUserId: string;
-
-        if (existingAuthUser.user) {
-          authUserId = existingAuthUser.user.id;
-          console.log(`Auth user already exists: ${user.email}`);
-        } else {
-          // Create user in Supabase Auth
-          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: user.email,
-            password: user.password,
-            email_confirm: true,
-            user_metadata: {
-              first_name: user.firstName,
-              last_name: user.lastName,
-              user_type: user.userType
-            }
-          });
-
-          if (authError) {
-            console.error(`Failed to create auth user ${user.email}:`, authError);
-            results.push({ email: user.email, success: false, error: authError.message });
-            continue;
+        // First, try to delete existing user if they exist
+        try {
+          const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(user.email);
+          if (existingUser.user) {
+            console.log(`Deleting existing user: ${user.email}`);
+            await supabaseAdmin.auth.admin.deleteUser(existingUser.user.id);
+            
+            // Also delete from users table
+            await supabaseAdmin
+              .from('users')
+              .delete()
+              .eq('email', user.email);
           }
-
-          if (!authData.user) {
-            console.error(`No auth user data returned for ${user.email}`);
-            results.push({ email: user.email, success: false, error: 'No user data returned' });
-            continue;
-          }
-
-          authUserId = authData.user.id;
-          console.log(`Created auth user: ${user.email} with ID: ${authUserId}`);
+        } catch (deleteError) {
+          console.log(`No existing user to delete: ${user.email}`);
         }
 
-        // Check if user profile already exists
-        const { data: existingProfile } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .eq('email', user.email)
-          .single();
+        // Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: user.firstName,
+            last_name: user.lastName,
+            user_type: user.userType
+          }
+        });
 
-        if (existingProfile) {
-          console.log(`Profile already exists for: ${user.email}`);
-          results.push({ email: user.email, success: true, message: 'User already exists' });
+        if (authError) {
+          console.error(`Failed to create auth user ${user.email}:`, authError);
+          results.push({ email: user.email, success: false, error: authError.message });
           continue;
         }
+
+        if (!authData.user) {
+          console.error(`No auth user data returned for ${user.email}`);
+          results.push({ email: user.email, success: false, error: 'No user data returned' });
+          continue;
+        }
+
+        const authUserId = authData.user.id;
+        console.log(`Created auth user: ${user.email} with ID: ${authUserId}`);
 
         // Create user profile in users table
         const { data: profileData, error: profileError } = await supabaseAdmin
@@ -166,11 +160,19 @@ Deno.serve(async (req: Request) => {
 
         if (profileError) {
           console.error(`Failed to create profile for ${user.email}:`, profileError);
+          
+          // If profile creation fails, delete the auth user to maintain consistency
+          try {
+            await supabaseAdmin.auth.admin.deleteUser(authUserId);
+          } catch (cleanupError) {
+            console.error(`Failed to cleanup auth user ${user.email}:`, cleanupError);
+          }
+          
           results.push({ email: user.email, success: false, error: profileError.message });
           continue;
         }
 
-        console.log(`Created profile for: ${user.email}`);
+        console.log(`Created complete user: ${user.email}`);
         results.push({ email: user.email, success: true, message: 'User created successfully' });
 
       } catch (error) {
@@ -183,10 +185,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        message: 'Demo users processing completed',
+        success: successCount > 0, 
+        message: `Demo users created: ${successCount}/${totalCount}`,
         results 
       }),
       {

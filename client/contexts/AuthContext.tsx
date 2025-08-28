@@ -1,159 +1,72 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '../../shared/types/database';
-import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import authService from '../services/authService';
+import { User, CreateUserInput } from '../../shared/types/database';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (userData: CreateUserInput) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  register: (userData: any) => Promise<{ success: boolean; error?: string }>;
-  updateUser: (userData: Partial<User>) => void;
-  redirectToDashboard: (userType?: string) => void;
-  checkAuthStatus: () => Promise<void>;
+  redirectToDashboard: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  const redirectToDashboard = (userType?: string) => {
-    const type = userType || user?.user_type;
-    console.log('Redirecting user type:', type);
-    
-    switch (type) {
-      case 'admin':
-        navigate('/admin-dashboard', { replace: true });
-        break;
-      case 'reviewer':
-        navigate('/reviewer-dashboard', { replace: true });
-        break;
-      case 'donor':
-        navigate('/donor-dashboard', { replace: true });
-        break;
-      case 'student':
-      default:
-        navigate('/student-dashboard', { replace: true });
-        break;
-    }
-  };
+  const isAuthenticated = !!user;
 
-  const checkAuthStatus = async () => {
-    try {
-      setIsLoading(true);
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Session error:', error);
-        setUser(null);
-        return;
-      }
-
-      if (session?.user) {
-        // Get user profile from our users table
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (userError) {
-          console.error('User fetch error:', userError);
-          setUser(null);
-        } else {
-          setUser(userData);
-          console.log('User authenticated:', userData.email, 'Role:', userData.user_type);
-        }
-      } else {
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Auth check error:', error);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Initialize auth state
   useEffect(() => {
-    // Initial auth check
-    checkAuthStatus();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          // Get user profile
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (!error && userData) {
-            setUser(userData);
-            console.log('Setting user and redirecting:', userData.user_type);
-            // Auto-redirect on successful sign in
-            setTimeout(() => {
-              redirectToDashboard(userData.user_type);
-            }, 100);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          navigate('/', { replace: true });
-        }
-        
+    const initializeAuth = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
         setIsLoading(false);
       }
-    );
+    };
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    initializeAuth();
+  }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const redirectToDashboard = () => {
+    if (!user) return;
+    
+    const dashboardPath = authService.getDashboardPath(user);
+    console.log(`Redirecting ${user.user_type} to ${dashboardPath}`);
+    navigate(dashboardPath, { replace: true });
+  };
+
+  const login = async (email: string, password: string) => {
     try {
-      console.log('Attempting login for:', email);
       setIsLoading(true);
+      const result = await authService.login(email, password);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password
-      });
-
-      if (error) {
-        console.error('Login error:', error);
-        return { success: false, error: error.message };
+      if (result.success && result.user) {
+        setUser(result.user);
+        
+        // Immediate redirection after successful login
+        setTimeout(() => {
+          const dashboardPath = authService.getDashboardPath(result.user);
+          console.log(`Login successful, redirecting to: ${dashboardPath}`);
+          navigate(dashboardPath, { replace: true });
+        }, 100);
+        
+        return { success: true };
+      } else {
+        return { success: false, error: result.error };
       }
-
-      if (!data.user) {
-        return { success: false, error: 'Login failed - no user data' };
-      }
-
-      console.log('Auth login successful, getting user profile...');
-      
-      // The auth state change listener will handle the redirection
-      return { success: true };
     } catch (error) {
-      console.error('Login exception:', error);
+      console.error('Login error:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Login failed' 
@@ -163,62 +76,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (userData: any): Promise<{ success: boolean; error?: string }> => {
+  const register = async (userData: CreateUserInput) => {
     try {
       setIsLoading(true);
-
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email.trim().toLowerCase(),
-        password: userData.password,
-        options: {
-          data: {
-            first_name: userData.firstName,
-            last_name: userData.lastName,
-            user_type: userData.userType,
-            phone: userData.phone
-          }
-        }
-      });
-
-      if (authError) {
-        return { success: false, error: authError.message };
-      }
-
-      if (!authData.user) {
-        return { success: false, error: 'Failed to create account' };
-      }
-
-      // Create user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: userData.email.trim().toLowerCase(),
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          phone: userData.phone,
-          user_type: userData.userType,
-          profile_data: userData.profileData || {},
-          email_verified: false
-        })
-        .select()
-        .single();
-
-      if (profileError) {
-        return { success: false, error: 'Failed to create user profile' };
-      }
-
-      setUser(profileData);
+      const result = await authService.register(userData);
       
-      // Redirect after successful registration
-      setTimeout(() => {
-        redirectToDashboard(profileData.user_type);
-      }, 100);
-      
-      return { success: true };
+      if (result.success && result.user) {
+        setUser(result.user);
+        
+        // Immediate redirection after successful registration
+        setTimeout(() => {
+          const dashboardPath = authService.getDashboardPath(result.user);
+          console.log(`Registration successful, redirecting to: ${dashboardPath}`);
+          navigate(dashboardPath, { replace: true });
+        }, 100);
+        
+        return { success: true };
+      } else {
+        return { success: false, error: result.error };
+      }
     } catch (error) {
-      console.error('Register error:', error);
+      console.error('Registration error:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Registration failed' 
@@ -228,40 +106,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = async () => {
     try {
-      await supabase.auth.signOut();
+      setIsLoading(true);
+      await authService.logout();
       setUser(null);
-      navigate('/', { replace: true });
+      navigate('/auth', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const updateUser = (userData: Partial<User>): void => {
-    if (user) {
-      const updatedUser = { ...user, ...userData };
-      setUser(updatedUser);
-    }
-  };
-
-  const value: AuthContextType = {
-    user,
-    isAuthenticated: !!user,
-    isLoading,
-    login,
-    logout,
-    register,
-    updateUser,
-    redirectToDashboard,
-    checkAuthStatus,
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isLoading,
+        login,
+        register,
+        logout,
+        redirectToDashboard,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export default AuthContext;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
