@@ -42,6 +42,8 @@ class AuthService {
         };
       }
 
+      console.log('Auth successful, fetching user profile...');
+
       // Get user profile from our users table
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -51,9 +53,57 @@ class AuthService {
 
       if (userError) {
         console.error('User profile error:', userError);
+        
+        // If RLS error, try to create profile from auth metadata
+        if (userError.code === '42P17' || userError.message.includes('infinite recursion')) {
+          console.log('RLS error detected, attempting to create profile from auth metadata');
+          
+          const userMetadata = data.user.user_metadata;
+          if (userMetadata && userMetadata.user_type) {
+            try {
+              const { data: newProfile, error: createError } = await supabase
+                .from('users')
+                .insert({
+                  id: data.user.id,
+                  email: data.user.email || email,
+                  first_name: userMetadata.first_name || 'Demo',
+                  last_name: userMetadata.last_name || 'User',
+                  phone: userMetadata.phone || null,
+                  user_type: userMetadata.user_type,
+                  is_active: true,
+                  email_verified: true,
+                  profile_data: {}
+                })
+                .select()
+                .single();
+
+              if (createError) {
+                console.error('Profile creation error:', createError);
+                return { 
+                  success: false, 
+                  error: 'Failed to create user profile' 
+                };
+              }
+
+              console.log('Profile created from auth metadata');
+              return {
+                success: true,
+                user: newProfile,
+                message: 'Login successful'
+              };
+            } catch (createErr) {
+              console.error('Profile creation exception:', createErr);
+              return { 
+                success: false, 
+                error: 'Failed to create user profile' 
+              };
+            }
+          }
+        }
+        
         return { 
           success: false, 
-          error: 'Failed to load user profile' 
+          error: 'Failed to load user profile. Please try creating demo users first.' 
         };
       }
 
@@ -148,7 +198,7 @@ class AuthService {
     }
   }
 
-  // Create demo users in Supabase Auth
+  // Create demo users via edge function
   async createDemoUsers(): Promise<{ success: boolean; error?: string; message?: string }> {
     try {
       console.log('Creating demo users via edge function...');
@@ -165,19 +215,16 @@ class AuthService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Edge function response error:', errorText);
-        throw new Error(`Failed to create demo users: ${response.status} ${response.statusText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
       console.log('Demo users creation result:', result);
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create demo users');
-      }
-
       return {
-        success: true,
-        message: 'Demo users created successfully! You can now login with the demo credentials.'
+        success: result.success,
+        message: result.message || 'Demo users processed',
+        error: result.success ? undefined : (result.error || 'Failed to create demo users')
       };
     } catch (error) {
       console.error('Error creating demo users:', error);
@@ -339,6 +386,9 @@ class AuthService {
     }
     if (errorMessage.includes('Unable to validate email address')) {
       return 'Please enter a valid email address.';
+    }
+    if (errorMessage.includes('infinite recursion')) {
+      return 'Database configuration issue. Please contact support.';
     }
     
     return errorMessage;

@@ -56,41 +56,39 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase environment variables')
+    }
+
     // Create admin client using service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    )
+    })
 
     console.log('Starting demo user creation process...')
     const results = []
 
     for (const user of DEMO_USERS) {
       try {
-        console.log(`Creating user: ${user.email}`)
+        console.log(`Processing user: ${user.email}`)
 
-        // First, try to delete existing user if they exist
+        // Check if user already exists in auth.users
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
         const existingUser = existingUsers.users?.find(u => u.email === user.email)
         
         if (existingUser) {
-          console.log(`Deleting existing user: ${user.email}`)
-          await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
-          
-          // Also delete from users table
-          await supabaseAdmin
-            .from('users')
-            .delete()
-            .eq('id', existingUser.id)
+          console.log(`User ${user.email} already exists, skipping creation`)
+          results.push({ email: user.email, success: true, message: 'Already exists' })
+          continue
         }
 
-        // Create new auth user
+        // Create new auth user with metadata
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: user.email,
           password: user.password,
@@ -111,13 +109,13 @@ Deno.serve(async (req) => {
 
         if (!authUser.user) {
           console.error(`No user returned for ${user.email}`)
-          results.push({ email: user.email, success: false, error: 'No user returned' })
+          results.push({ email: user.email, success: false, error: 'No user returned from auth creation' })
           continue
         }
 
         console.log(`Auth user created for ${user.email}, ID: ${authUser.user.id}`)
 
-        // Create user profile in users table
+        // Create user profile in users table using service role (bypasses RLS)
         const { error: profileError } = await supabaseAdmin
           .from('users')
           .insert({
@@ -134,15 +132,17 @@ Deno.serve(async (req) => {
 
         if (profileError) {
           console.error(`Profile creation error for ${user.email}:`, profileError)
-          results.push({ email: user.email, success: false, error: profileError.message })
+          // Try to clean up auth user if profile creation failed
+          await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
+          results.push({ email: user.email, success: false, error: `Profile creation failed: ${profileError.message}` })
           continue
         }
 
-        console.log(`Profile created for ${user.email}`)
-        results.push({ email: user.email, success: true })
+        console.log(`Profile created successfully for ${user.email}`)
+        results.push({ email: user.email, success: true, message: 'Created successfully' })
 
       } catch (error) {
-        console.error(`Error creating user ${user.email}:`, error)
+        console.error(`Unexpected error creating user ${user.email}:`, error)
         results.push({ 
           email: user.email, 
           success: false, 
@@ -159,8 +159,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: successCount > 0,
-        message: `Created ${successCount} demo users successfully${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
-        results
+        message: `Demo users processed: ${successCount} successful, ${failureCount} failed`,
+        results,
+        details: results
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -172,7 +173,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: 'Failed to create demo users'
       }),
       {
         status: 500,
