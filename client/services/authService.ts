@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { User, CreateUserInput } from '../../shared/types/database';
 
 export interface AuthResult {
