@@ -1,5 +1,4 @@
-import { supabase } from '../lib/supabase';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { User, CreateUserInput } from '../../shared/types/database';
 
 export interface AuthResult {
@@ -21,6 +20,14 @@ class AuthService {
   // Login with email and password
   async login(email: string, password: string): Promise<AuthResult> {
     try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured) {
+        return {
+          success: false,
+          error: 'Supabase is not configured. Please set up your Supabase connection first.'
+        };
+      }
+
       console.log('Attempting login for:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -36,7 +43,7 @@ class AuthService {
         };
       }
 
-      if (!data.user) {
+      if (!data.user || !data.session) {
         return { 
           success: false, 
           error: 'Login failed - no user data received' 
@@ -60,107 +67,12 @@ class AuthService {
         };
       }
 
-      // If no user profile found, try to create one from auth metadata
+      // If no user profile found, return error with helpful message
       if (!userData) {
-        console.log('User profile not found, attempting to create from auth metadata');
-        
-        const userMetadata = data.user.user_metadata;
-        if (userMetadata && userMetadata.user_type) {
-          try {
-            // First check if a profile exists with this email but different ID
-            const { data: existingProfile, error: existingError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('email', data.user.email || email)
-              .maybeSingle();
-
-            if (existingError) {
-              console.error('Error checking existing profile:', existingError);
-              return { 
-                success: false, 
-                error: 'Failed to check existing user profile' 
-              };
-            }
-
-            // If profile exists with different ID, update the ID to match auth user
-            if (existingProfile && existingProfile.id !== data.user.id) {
-              console.log('Found existing profile with different ID, updating...');
-              const { data: updatedProfile, error: updateError } = await supabase
-                .from('users')
-                .update({ id: data.user.id })
-                .eq('email', data.user.email || email)
-                .select()
-                .single();
-
-              if (updateError) {
-                console.error('Profile update error:', updateError);
-                return { 
-                  success: false, 
-                  error: 'Failed to update user profile' 
-                };
-              }
-
-              console.log('Profile updated successfully');
-              return {
-                success: true,
-                user: updatedProfile,
-                message: 'Login successful'
-              };
-            }
-
-            // If profile exists with same ID, return it
-            if (existingProfile && existingProfile.id === data.user.id) {
-              console.log('Found existing profile with matching ID');
-              return {
-                success: true,
-                user: existingProfile,
-                message: 'Login successful'
-              };
-            }
-
-            // No existing profile found, create new one
-            const { data: newProfile, error: createError } = await supabase
-              .from('users')
-              .insert({
-                id: data.user.id,
-                email: data.user.email || email,
-                first_name: userMetadata.first_name || 'Demo',
-                last_name: userMetadata.last_name || 'User',
-                phone: userMetadata.phone || null,
-                user_type: userMetadata.user_type,
-                is_active: true,
-                email_verified: true,
-                profile_data: {}
-              })
-              .select()
-              .single();
-
-            if (createError) {
-              console.error('Profile creation error:', createError);
-              return { 
-                success: false, 
-                error: 'Failed to create user profile' 
-              };
-            }
-
-            console.log('Profile created from auth metadata');
-            return {
-              success: true,
-              user: newProfile,
-              message: 'Login successful'
-            };
-          } catch (createErr) {
-            console.error('Profile creation exception:', createErr);
-            return { 
-              success: false, 
-              error: 'Failed to create user profile' 
-            };
-          }
-        }
-        
+        console.log('User profile not found for authenticated user');
         return { 
           success: false, 
-          error: 'User profile not found. Please try creating demo users first.' 
+          error: 'User profile not found. Please create demo users first by clicking "Create Demo Users" button.' 
         };
       }
 
@@ -183,6 +95,14 @@ class AuthService {
   // Register new user
   async register(userData: CreateUserInput): Promise<AuthResult> {
     try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured) {
+        return {
+          success: false,
+          error: 'Supabase is not configured. Please set up your Supabase connection first.'
+        };
+      }
+
       console.log('Attempting registration for:', userData.email);
 
       // Create auth user
@@ -257,15 +177,15 @@ class AuthService {
 
   // Create demo users via edge function
   async createDemoUsers(): Promise<{ success: boolean; error?: string; message?: string }> {
-    // Check if Supabase is configured
-    if (!isSupabaseConfigured) {
-      return {
-        success: false,
-        error: 'Supabase is not configured. Please set up your Supabase connection first.'
-      };
-    }
-
     try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured) {
+        return {
+          success: false,
+          error: 'Supabase is not configured. Please set up your Supabase connection first.'
+        };
+      }
+
       console.log('Creating demo users via edge function...');
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-demo-users`, {
@@ -303,6 +223,10 @@ class AuthService {
   // Logout user
   async logout(): Promise<AuthResult> {
     try {
+      if (!isSupabaseConfigured) {
+        return { success: true, message: 'Logout successful' };
+      }
+
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -328,55 +252,30 @@ class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Check environment variables first
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        console.log('Supabase environment variables not configured');
+      if (!isSupabaseConfigured) {
         return null;
       }
 
       // First check if we have an authenticated session
       const { data: { user }, error: sessionError } = await supabase.auth.getUser();
       
-      if (sessionError) {
-        // Don't log network errors as they're expected when Supabase isn't configured
-        if (!sessionError.message.includes('Failed to fetch')) {
-          console.error('Session error:', sessionError);
-        }
+      if (sessionError || !user) {
         return null;
       }
-      
-      if (!user) return null;
 
-      // Try to get user profile - use maybeSingle() to handle 0 rows gracefully
+      // Get user profile
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (error) {
-        // Don't log PGRST116 errors as they're expected when no profile exists
-        if (error.code !== 'PGRST116') {
-          console.error('Get current user error:', error);
-        }
-        return null;
-      }
-
-      // If no user profile found, return null (don't create here)
-      if (!userData) {
-        // Only log if we have a valid session but no profile
-        if (user) {
-          console.log('No user profile found for authenticated user');
-        }
+      if (error || !userData) {
         return null;
       }
 
       return userData;
     } catch (error) {
-      // Only log non-network errors
-      if (error instanceof Error && !error.message.includes('Failed to fetch')) {
-        console.error('Get current user exception:', error);
-      }
       return null;
     }
   }
@@ -384,6 +283,13 @@ class AuthService {
   // Update user profile
   async updateProfile(userId: string, profileData: Partial<User>): Promise<AuthResult> {
     try {
+      if (!isSupabaseConfigured) {
+        return {
+          success: false,
+          error: 'Supabase is not configured'
+        };
+      }
+
       const { data, error } = await supabase
         .from('users')
         .update({
@@ -421,10 +327,11 @@ class AuthService {
   // Check if user is authenticated
   async isAuthenticated(): Promise<boolean> {
     try {
+      if (!isSupabaseConfigured) return false;
+      
       const { data: { session } } = await supabase.auth.getSession();
       return !!session?.user;
     } catch (error) {
-      console.error('Auth check error:', error);
       return false;
     }
   }
@@ -469,7 +376,7 @@ class AuthService {
   // Convert Supabase errors to user-friendly messages
   private getReadableError(errorMessage: string): string {
     if (errorMessage.includes('Invalid login credentials')) {
-      return 'Invalid email or password. Please make sure you have created the demo users first by clicking "Create Demo Users" button.';
+      return 'Invalid email or password. Please make sure you have created the demo users first.';
     }
     if (errorMessage.includes('Email not confirmed')) {
       return 'Please check your email and click the confirmation link before signing in.';
@@ -482,9 +389,6 @@ class AuthService {
     }
     if (errorMessage.includes('Unable to validate email address')) {
       return 'Please enter a valid email address.';
-    }
-    if (errorMessage.includes('infinite recursion')) {
-      return 'Database configuration issue. Please contact support.';
     }
     
     return errorMessage;
