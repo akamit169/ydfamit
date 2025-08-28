@@ -319,14 +319,13 @@ class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Check if Supabase is properly configured
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        console.error('Supabase environment variables not configured');
+      // First check if we have an authenticated session
+      const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
         return null;
       }
-
-      // First check if we have an authenticated session
-      const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return null;
 
@@ -351,12 +350,6 @@ class AuthService {
       return userData;
     } catch (error) {
       console.error('Get current user exception:', error);
-      
-      // Handle network errors gracefully
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.error('Network error - Supabase connection failed');
-      }
-      
       return null;
     }
   }
