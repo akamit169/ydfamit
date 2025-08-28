@@ -23,7 +23,6 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.56.0",
     "@supabase/supabase-js": "^2.39.0",
     "i18next": "^25.3.2",
     "react-i18next": "^15.6.0",
