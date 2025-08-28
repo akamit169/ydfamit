@@ -149,7 +149,7 @@ class AuthService {
   }
 
   // Create demo users in Supabase Auth
-  async createDemoUsers(): Promise<void> {
+  async createDemoUsers(): Promise<{ success: boolean; error?: string; message?: string }> {
     try {
       console.log('Creating demo users via edge function...');
       
@@ -175,10 +175,16 @@ class AuthService {
         throw new Error(result.error || 'Failed to create demo users');
       }
 
-      console.log('Demo users created successfully');
+      return {
+        success: true,
+        message: 'Demo users created successfully! You can now login with the demo credentials.'
+      };
     } catch (error) {
       console.error('Error creating demo users:', error);
-      throw error;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create demo users'
+      };
     }
   }
 
@@ -320,7 +326,7 @@ class AuthService {
   // Convert Supabase errors to user-friendly messages
   private getReadableError(errorMessage: string): string {
     if (errorMessage.includes('Invalid login credentials')) {
-      return 'Invalid email or password. Please check your credentials and try again.';
+      return 'Invalid email or password. Make sure you have created the demo users first by clicking "Create Demo Users" button.';
     }
     if (errorMessage.includes('Email not confirmed')) {
       return 'Please check your email and click the confirmation link before signing in.';
@@ -341,11 +347,3 @@ class AuthService {
 
 export const authService = new AuthService();
 export default authService;
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};

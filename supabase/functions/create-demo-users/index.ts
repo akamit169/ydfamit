@@ -1,69 +1,37 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
-
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-interface DemoUser {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  userType: string;
-  phone: string;
-  profileData: Record<string, any>;
-}
-
 Deno.serve(async (req: Request) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   try {
-    // Initialize Supabase admin client with service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const demoUsers: DemoUser[] = [
+    const demoUsers = [
       {
         email: 'student@demo.com',
         password: 'student123',
         firstName: 'Demo',
         lastName: 'Student',
         userType: 'student',
-        phone: '+91 9876543210',
-        profileData: {
-          course: 'B.Tech Computer Science',
-          college: 'Demo University',
-          year: '3rd Year',
-          cgpa: '8.5',
-          category: 'General',
-          family_income: '500000'
-        }
+        phone: '+91 9876543210'
       },
       {
         email: 'admin@demo.com',
         password: 'admin123',
         firstName: 'Demo',
-        lastName: 'Administrator',
+        lastName: 'Admin',
         userType: 'admin',
-        phone: '+91 9876543211',
-        profileData: {
-          department: 'Operations',
-          role: 'System Administrator',
-          permissions: ['all']
-        }
+        phone: '+91 9876543211'
       },
       {
         email: 'reviewer@demo.com',
@@ -71,12 +39,7 @@ Deno.serve(async (req: Request) => {
         firstName: 'Demo',
         lastName: 'Reviewer',
         userType: 'reviewer',
-        phone: '+91 9876543212',
-        profileData: {
-          specialization: 'Academic Excellence',
-          experience: '5 years',
-          institution: 'Demo Review Board'
-        }
+        phone: '+91 9876543212'
       },
       {
         email: 'donor@demo.com',
@@ -84,12 +47,7 @@ Deno.serve(async (req: Request) => {
         firstName: 'Demo',
         lastName: 'Donor',
         userType: 'donor',
-        phone: '+91 9876543213',
-        profileData: {
-          organization: 'Demo Foundation',
-          contribution_type: 'Individual',
-          interests: ['Education', 'Technology']
-        }
+        phone: '+91 9876543213'
       }
     ];
 
@@ -97,55 +55,53 @@ Deno.serve(async (req: Request) => {
 
     for (const user of demoUsers) {
       try {
-        // First, try to delete existing user if they exist
-        try {
-          const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(user.email);
-          if (existingUser.user) {
-            console.log(`Deleting existing user: ${user.email}`);
-            await supabaseAdmin.auth.admin.deleteUser(existingUser.user.id);
-            
-            // Also delete from users table
-            await supabaseAdmin
-              .from('users')
-              .delete()
-              .eq('email', user.email);
-          }
-        } catch (deleteError) {
-          console.log(`No existing user to delete: ${user.email}`);
-        }
-
-        // Create user in Supabase Auth
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: user.email,
-          password: user.password,
-          email_confirm: true,
-          user_metadata: {
-            first_name: user.firstName,
-            last_name: user.lastName,
-            user_type: user.userType
-          }
+        // Create user in Supabase Auth using Admin API
+        const authResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+            'apikey': serviceRoleKey
+          },
+          body: JSON.stringify({
+            email: user.email,
+            password: user.password,
+            email_confirm: true,
+            user_metadata: {
+              first_name: user.firstName,
+              last_name: user.lastName,
+              user_type: user.userType,
+              phone: user.phone
+            }
+          })
         });
 
-        if (authError) {
-          console.error(`Failed to create auth user ${user.email}:`, authError);
-          results.push({ email: user.email, success: false, error: authError.message });
-          continue;
+        if (!authResponse.ok) {
+          const errorText = await authResponse.text();
+          console.error(`Failed to create auth user ${user.email}:`, errorText);
+          
+          // If user already exists, that's okay
+          if (errorText.includes('already registered')) {
+            console.log(`User ${user.email} already exists in auth`);
+          } else {
+            throw new Error(`Auth creation failed: ${errorText}`);
+          }
         }
 
-        if (!authData.user) {
-          console.error(`No auth user data returned for ${user.email}`);
-          results.push({ email: user.email, success: false, error: 'No user data returned' });
-          continue;
-        }
+        const authUser = authResponse.ok ? await authResponse.json() : null;
+        const userId = authUser?.id || user.email; // Fallback for existing users
 
-        const authUserId = authData.user.id;
-        console.log(`Created auth user: ${user.email} with ID: ${authUserId}`);
-
-        // Create user profile in users table
-        const { data: profileData, error: profileError } = await supabaseAdmin
-          .from('users')
-          .insert({
-            id: authUserId,
+        // Create or update user profile in users table
+        const profileResponse = await fetch(`${supabaseUrl}/rest/v1/users`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+            'apikey': serviceRoleKey,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            id: authUser?.id,
             email: user.email,
             first_name: user.firstName,
             last_name: user.lastName,
@@ -153,67 +109,59 @@ Deno.serve(async (req: Request) => {
             user_type: user.userType,
             is_active: true,
             email_verified: true,
-            profile_data: user.profileData
+            profile_data: {}
           })
-          .select()
-          .single();
+        });
 
-        if (profileError) {
-          console.error(`Failed to create profile for ${user.email}:`, profileError);
-          
-          // If profile creation fails, delete the auth user to maintain consistency
-          try {
-            await supabaseAdmin.auth.admin.deleteUser(authUserId);
-          } catch (cleanupError) {
-            console.error(`Failed to cleanup auth user ${user.email}:`, cleanupError);
-          }
-          
-          results.push({ email: user.email, success: false, error: profileError.message });
-          continue;
+        if (!profileResponse.ok) {
+          const errorText = await profileResponse.text();
+          console.error(`Failed to create profile for ${user.email}:`, errorText);
         }
 
-        console.log(`Created complete user: ${user.email}`);
-        results.push({ email: user.email, success: true, message: 'User created successfully' });
+        results.push({
+          email: user.email,
+          role: user.userType,
+          status: 'created'
+        });
 
       } catch (error) {
-        console.error(`Error processing user ${user.email}:`, error);
-        results.push({ 
-          email: user.email, 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        console.error(`Error creating user ${user.email}:`, error);
+        results.push({
+          email: user.email,
+          role: user.userType,
+          status: 'error',
+          error: error.message
         });
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const totalCount = results.length;
-
     return new Response(
-      JSON.stringify({ 
-        success: successCount > 0, 
-        message: `Demo users created: ${successCount}/${totalCount}`,
-        results 
+      JSON.stringify({
+        success: true,
+        message: 'Demo users setup completed',
+        users: results
       }),
       {
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          ...corsHeaders 
+          ...corsHeaders,
         },
       }
     );
 
   } catch (error) {
-    console.error('Edge function error:', error);
+    console.error('Demo users creation error:', error);
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Failed to create demo users'
       }),
       {
         status: 500,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          ...corsHeaders 
+          ...corsHeaders,
         },
       }
     );

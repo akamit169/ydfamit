@@ -1,134 +1,97 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Users, 
-  CheckCircle, 
-  AlertCircle, 
-  Loader2,
-  Database,
-  Shield
-} from 'lucide-react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
+import { CheckCircle, AlertCircle, Users, Loader2 } from 'lucide-react';
 import authService from '../services/authService';
 
-const DemoSetup = () => {
+export default function DemoSetup() {
   const [isCreating, setIsCreating] = useState(false);
-  const [setupStatus, setSetupStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle');
-  const [error, setError] = useState('');
-  const [results, setResults] = useState<any[]>([]);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
 
   const handleCreateDemoUsers = async () => {
     setIsCreating(true);
-    setSetupStatus('creating');
-    setError('');
-    setResults([]);
+    setStatus('idle');
+    setMessage('');
 
     try {
-      console.log('Starting demo user creation...');
-      await authService.createDemoUsers();
-      setSetupStatus('success');
-      console.log('Demo users created successfully');
+      const result = await authService.createDemoUsers();
+      
+      if (result.success) {
+        setStatus('success');
+        setMessage(result.message || 'Demo users created successfully!');
+      } else {
+        setStatus('error');
+        setMessage(result.error || 'Failed to create demo users');
+      }
     } catch (error) {
-      console.error('Demo setup error:', error);
-      setSetupStatus('error');
-      setError(error instanceof Error ? error.message : 'Failed to create demo users');
+      setStatus('error');
+      setMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setIsCreating(false);
     }
   };
 
-  const demoCredentials = authService.getDemoCredentials();
-
   return (
     <Card className="border-blue-200 bg-blue-50">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-blue-800">
-          <Database className="h-5 w-5" />
-          <span>Demo Environment Setup</span>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm text-blue-800 flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Demo Environment Setup
         </CardTitle>
+        <CardDescription className="text-xs text-blue-600">
+          Create demo user accounts to test the application with different roles
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {setupStatus === 'idle' && (
-          <div>
-            <p className="text-sm text-blue-700 mb-4">
-              Set up demo user accounts in Supabase Auth for testing all user roles.
-            </p>
-            <Button
-              onClick={handleCreateDemoUsers}
-              disabled={isCreating}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isCreating ? (
-                <div className="flex items-center space-x-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creating Demo Users...</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4" />
-                  <span>Create Demo Users</span>
-                </div>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {setupStatus === 'creating' && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            <AlertDescription className="text-blue-700">
-              Creating demo users in Supabase Auth... This may take a moment.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {setupStatus === 'success' && (
+      <CardContent className="pt-0 space-y-3">
+        {status === 'success' && (
           <Alert className="border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-700">
-              ✅ Demo users created successfully! You can now use the demo login credentials below.
+            <AlertDescription className="text-green-700 text-xs">
+              {message}
             </AlertDescription>
           </Alert>
         )}
 
-        {setupStatus === 'error' && (
+        {status === 'error' && (
           <Alert className="border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-700">
-              ❌ {error}
-              <br />
-              <span className="text-xs mt-1 block">
-                Please try again or check your Supabase connection.
-              </span>
+            <AlertDescription className="text-red-700 text-xs">
+              {message}
             </AlertDescription>
           </Alert>
         )}
 
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Demo Credentials:</h4>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {Object.entries(demoCredentials).map(([role, creds]) => (
-              <div key={role} className="bg-white p-2 rounded border">
-                <div className="font-medium text-gray-900 capitalize">{role}</div>
-                <div className="text-gray-600">{creds.email}</div>
-                <div className="text-gray-500">{creds.password}</div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-blue-600 mt-2">
-            Click "Create Demo Users" first, then use these credentials to login.
-          </p>
-        </div>
+        <Button
+          onClick={handleCreateDemoUsers}
+          disabled={isCreating}
+          size="sm"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          {isCreating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Creating Demo Users...
+            </>
+          ) : (
+            <>
+              <Users className="h-4 w-4 mr-2" />
+              Create Demo Users
+            </>
+          )}
+        </Button>
 
-        <div className="flex items-center space-x-2 text-xs text-blue-600">
-          <Shield className="h-3 w-3" />
-          <span>Demo users are created with proper authentication and role permissions</span>
+        <div className="text-xs text-blue-600 space-y-1">
+          <p><strong>This will create:</strong></p>
+          <ul className="list-disc list-inside space-y-0.5 ml-2">
+            <li>student@demo.com (password: student123)</li>
+            <li>admin@demo.com (password: admin123)</li>
+            <li>reviewer@demo.com (password: reviewer123)</li>
+            <li>donor@demo.com (password: donor123)</li>
+          </ul>
         </div>
       </CardContent>
     </Card>
   );
-};
-
-export default DemoSetup;
+}
