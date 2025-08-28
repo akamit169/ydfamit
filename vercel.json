@@ -3,6 +3,7 @@
   "outputDirectory": "dist/spa",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",

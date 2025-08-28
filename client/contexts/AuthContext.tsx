@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../../shared/types/database';
-import apiService from '../services/api';
+import { supabase } from '../lib/supabase';
+import supabaseService from '../services/supabaseService';
 
 interface AuthContextType {
   user: User | null;
@@ -31,25 +32,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in on app start
     const initializeAuth = async () => {
       try {
-        const token = apiService.getToken();
-        const storedUser = apiService.getCurrentUser();
+        // Check for existing session
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (token && storedUser) {
-          // Verify token is still valid
-          const response = await apiService.verifyToken();
-          if (response.success) {
-            setUser(storedUser);
-          } else {
-            // Token is invalid, clear auth
-            apiService.clearAuth();
-          }
+        if (session?.user) {
+          const currentUser = await supabaseService.getCurrentUser();
+          setUser(currentUser);
         }
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+              const currentUser = await supabaseService.getCurrentUser();
+              setUser(currentUser);
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null);
+            }
+          }
+        );
+
+        return () => subscription.unsubscribe();
       } catch (error) {
         console.error('Auth initialization error:', error);
-        apiService.clearAuth();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -60,7 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await apiService.login({ email, password });
+      const response = await supabaseService.login({ email, password });
       if (response.success && response.data) {
         setUser(response.data.user);
         return true;
@@ -74,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (userData: any): Promise<boolean> => {
     try {
-      const response = await apiService.register(userData);
+      const response = await supabaseService.register(userData);
       if (response.success && response.data) {
         setUser(response.data.user);
         return true;
@@ -88,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
-      await apiService.logout();
+      await supabaseService.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -100,7 +108,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
       setUser(updatedUser);
-      localStorage.setItem('ydf_user', JSON.stringify(updatedUser));
     }
   };
 

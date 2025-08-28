@@ -204,13 +204,13 @@ const Homepage = () => {
                 {isAuthenticated ? (
                   <>
                     <Link
-                      to={`/${user?.userType}-dashboard`}
+                      to={`/${user?.user_type || user?.userType}-dashboard`}
                       className="text-white hover:text-ydf-golden-yellow transition-colors font-medium"
                     >
                       Dashboard
                     </Link>
                     <span className="text-ydf-golden-yellow text-sm">
-                      {user?.firstName} {user?.lastName}
+                      {user?.first_name || user?.firstName} {user?.last_name || user?.lastName}
                     </span>
                     <button
                       onClick={() => logout()}

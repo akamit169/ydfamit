@@ -1,15 +1,24 @@
 // User types
 export interface User {
-  id: number;
+  id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   phone?: string;
-  userType: 'student' | 'admin' | 'reviewer' | 'donor';
-  isActive: boolean;
-  emailVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  user_type: 'student' | 'admin' | 'reviewer' | 'donor';
+  is_active: boolean;
+  email_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  profile_data?: any;
+  // Computed properties for backward compatibility
+  firstName?: string;
+  lastName?: string;
+  userType?: 'student' | 'admin' | 'reviewer' | 'donor';
+  isActive?: boolean;
+  emailVerified?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
   profileData?: any;
 }
 
@@ -36,55 +45,55 @@ export interface AuthResponse {
 
 // Scholarship types
 export interface Scholarship {
-  id: number;
+  id: string;
   title: string;
   description: string;
-  amount: string;
+  amount: number;
   currency: string;
-  eligibilityCriteria: any;
-  requiredDocuments: any;
-  applicationDeadline: Date;
-  selectionDeadline?: Date;
-  maxApplications?: number;
-  currentApplications: number;
+  eligibility_criteria: any;
+  required_documents: any;
+  application_deadline: string;
+  selection_deadline?: string;
+  max_applications?: number;
+  current_applications: number;
   status: 'active' | 'inactive' | 'closed';
-  createdBy?: number;
-  createdAt: Date;
-  updatedAt: Date;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
   tags?: any;
 }
 
 export interface CreateScholarshipInput {
   title: string;
   description: string;
-  amount: string;
+  amount: number;
   currency?: string;
-  eligibilityCriteria: any;
-  requiredDocuments: any;
-  applicationDeadline: Date;
-  selectionDeadline?: Date;
-  maxApplications?: number;
+  eligibility_criteria: any;
+  required_documents: any;
+  application_deadline: string;
+  selection_deadline?: string;
+  max_applications?: number;
   tags?: any;
 }
 
 // Application types
 export interface Application {
-  id: number;
-  studentId: number;
-  scholarshipId: number;
+  id: string;
+  student_id: string;
+  scholarship_id: string;
   status: 'submitted' | 'under_review' | 'approved' | 'rejected' | 'waitlisted';
-  applicationData: any;
+  application_data: any;
   documents?: any;
-  score?: string;
-  reviewNotes?: string;
-  reviewedBy?: number;
-  submittedAt: Date;
-  reviewedAt?: Date;
-  updatedAt: Date;
+  score?: number;
+  review_notes?: string;
+  reviewed_by?: string;
+  submitted_at: string;
+  reviewed_at?: string;
+  updated_at: string;
 }
 
 export interface CreateApplicationInput {
-  scholarshipId: number;
+  scholarshipId: string;
   applicationData: any;
   documents?: any;
 }

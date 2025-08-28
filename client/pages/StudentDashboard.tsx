@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useSupabaseQuery } from "../hooks/useSupabase";
+import { useAuth } from "../contexts/AuthContext";
 import OnboardingTour from "../components/OnboardingTour";
 import {
   GraduationCap,

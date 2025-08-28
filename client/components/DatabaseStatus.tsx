@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
-import apiService from '../services/api';
+import supabaseService from '../services/supabaseService';
 
 export const DatabaseStatus = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
@@ -11,7 +11,7 @@ export const DatabaseStatus = () => {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        await apiService.testConnection();
+        await supabaseService.testConnection();
         setIsConnected(true);
       } catch (error) {
         setIsConnected(false);
@@ -39,7 +39,7 @@ export const DatabaseStatus = () => {
       <Alert className="border-green-200 bg-green-50">
         <CheckCircle className="h-4 w-4 text-green-600" />
         <AlertDescription className="text-green-700">
-          ✅ Database connected successfully! Authentication is ready.
+          ✅ Supabase connected successfully! Authentication is ready.
         </AlertDescription>
       </Alert>
     );
@@ -50,25 +50,25 @@ export const DatabaseStatus = () => {
       <AlertCircle className="h-4 w-4 text-orange-600" />
       <AlertDescription className="text-orange-700">
         <div className="space-y-3">
-          <p className="font-medium">⚡ Backend server not connected</p>
+          <p className="font-medium">⚡ Supabase not connected</p>
           <p className="text-sm">
-            To enable real authentication, you need to:
+            To enable Supabase integration, you need to:
           </p>
           <ol className="text-sm space-y-1 ml-4 list-decimal">
-            <li>Set up PostgreSQL database (locally or cloud)</li>
-            <li>Create <code className="bg-orange-100 px-1 rounded">.env</code> file with DATABASE_URL</li>
-            <li>Run <code className="bg-orange-100 px-1 rounded">npm run db:migrate</code> to setup tables</li>
-            <li>Run <code className="bg-orange-100 px-1 rounded">npm run dev:server</code> in a new terminal</li>
+            <li>Click "Connect to Supabase" button in the top right</li>
+            <li>Set up your Supabase project and get credentials</li>
+            <li>Configure environment variables</li>
+            <li>Run database migrations</li>
           </ol>
           <div className="flex items-center space-x-2 mt-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('/docs/POSTGRESQL_SETUP.md', '_blank')}
+              onClick={() => window.open('https://supabase.com/docs/guides/getting-started', '_blank')}
               className="text-orange-700 border-orange-300 hover:bg-orange-100"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
-              PostgreSQL Setup Guide
+              Supabase Setup Guide
             </Button>
           </div>
         </div>

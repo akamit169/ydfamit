@@ -9,7 +9,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import apiService from '../services/api';
+import supabaseService from '../services/supabaseService';
 import DatabaseStatus from '../components/DatabaseStatus';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
@@ -102,7 +102,7 @@ export default function Auth() {
 
           // Navigate based on user type
           setTimeout(() => {
-            switch (formData.userType) {
+            switch (response.data!.user.user_type || response.data!.user.userType) {
               case 'admin':
                 navigate('/admin-dashboard');
                 break;
@@ -133,7 +133,7 @@ export default function Auth() {
 
           // Navigate based on user type
           setTimeout(() => {
-            switch (response.data!.user.userType) {
+            switch (response.data!.user.user_type || response.data!.user.userType) {
               case 'admin':
                 navigate('/admin-dashboard');
                 break;
