@@ -49,61 +49,65 @@ class AuthService {
         .from('users')
         .select('*')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
 
       if (userError) {
         console.error('User profile error:', userError);
+        return { 
+          success: false, 
+          error: 'Failed to load user profile' 
+        };
+      }
+
+      // If no user profile found, try to create one from auth metadata
+      if (!userData) {
+        console.log('User profile not found, attempting to create from auth metadata');
         
-        // If RLS error, try to create profile from auth metadata
-        if (userError.code === '42P17' || userError.code === 'PGRST116' || userError.message.includes('infinite recursion')) {
-          console.log('User profile not found or RLS error detected, attempting to create profile from auth metadata');
-          
-          const userMetadata = data.user.user_metadata;
-          if (userMetadata && userMetadata.user_type) {
-            try {
-              const { data: newProfile, error: createError } = await supabase
-                .from('users')
-                .insert({
-                  id: data.user.id,
-                  email: data.user.email || email,
-                  first_name: userMetadata.first_name || 'Demo',
-                  last_name: userMetadata.last_name || 'User',
-                  phone: userMetadata.phone || null,
-                  user_type: userMetadata.user_type,
-                  is_active: true,
-                  email_verified: true,
-                  profile_data: {}
-                })
-                .select()
-                .single();
+        const userMetadata = data.user.user_metadata;
+        if (userMetadata && userMetadata.user_type) {
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from('users')
+              .insert({
+                id: data.user.id,
+                email: data.user.email || email,
+                first_name: userMetadata.first_name || 'Demo',
+                last_name: userMetadata.last_name || 'User',
+                phone: userMetadata.phone || null,
+                user_type: userMetadata.user_type,
+                is_active: true,
+                email_verified: true,
+                profile_data: {}
+              })
+              .select()
+              .single();
 
-              if (createError) {
-                console.error('Profile creation error:', createError);
-                return { 
-                  success: false, 
-                  error: 'Failed to create user profile' 
-                };
-              }
-
-              console.log('Profile created from auth metadata');
-              return {
-                success: true,
-                user: newProfile,
-                message: 'Login successful'
-              };
-            } catch (createErr) {
-              console.error('Profile creation exception:', createErr);
+            if (createError) {
+              console.error('Profile creation error:', createError);
               return { 
                 success: false, 
                 error: 'Failed to create user profile' 
               };
             }
+
+            console.log('Profile created from auth metadata');
+            return {
+              success: true,
+              user: newProfile,
+              message: 'Login successful'
+            };
+          } catch (createErr) {
+            console.error('Profile creation exception:', createErr);
+            return { 
+              success: false, 
+              error: 'Failed to create user profile' 
+            };
           }
         }
         
         return { 
           success: false, 
-          error: 'Failed to load user profile. Please try creating demo users first.' 
+          error: 'User profile not found. Please try creating demo users first.' 
         };
       }
 

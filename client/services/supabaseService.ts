@@ -530,9 +530,17 @@ class SupabaseService {
   // Test connection
   async testConnection(): Promise<ApiResponse> {
     try {
+      // Check if environment variables are configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        return {
+          success: false,
+          error: 'Supabase environment variables not configured'
+        };
+      }
+
       const { data, error } = await supabase
         .from('users')
-        .select('count')
+        .select('id')
         .limit(1);
 
       if (error) {
@@ -548,6 +556,15 @@ class SupabaseService {
       };
     } catch (error) {
       console.error('Test connection error:', error);
+      
+      // Handle network errors specifically
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        return {
+          success: false,
+          error: 'Network error - Unable to connect to Supabase. Please check your internet connection and Supabase configuration.'
+        };
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Connection test failed'
