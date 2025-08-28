@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../../shared/types/database';
 import { supabase } from '../lib/supabase';
 import supabaseService from '../services/supabaseService';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   register: (userData: any) => Promise<boolean>;
   updateUser: (userData: Partial<User>) => void;
+  redirectToDashboard: (userType?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,7 +32,26 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
+  const redirectToDashboard = (userType?: string) => {
+    const type = userType || user?.user_type || user?.userType;
+    switch (type) {
+      case 'admin':
+        navigate('/admin-dashboard');
+        break;
+      case 'reviewer':
+        navigate('/reviewer-dashboard');
+        break;
+      case 'donor':
+        navigate('/donor-dashboard');
+        break;
+      case 'student':
+      default:
+        navigate('/student-dashboard');
+        break;
+    }
+  };
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -48,8 +69,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (event === 'SIGNED_IN' && session?.user) {
               const currentUser = await supabaseService.getCurrentUser();
               setUser(currentUser);
+              // Auto-redirect on successful auth
+              if (currentUser && window.location.pathname === '/auth') {
+                redirectToDashboard(currentUser.user_type || currentUser.userType);
+              }
             } else if (event === 'SIGNED_OUT') {
               setUser(null);
+              navigate('/');
             }
           }
         );
@@ -71,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await supabaseService.login({ email, password });
       if (response.success && response.data) {
         setUser(response.data.user);
+        redirectToDashboard(response.data.user.user_type || response.data.user.userType);
         return true;
       }
       return false;
@@ -85,6 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await supabaseService.register(userData);
       if (response.success && response.data) {
         setUser(response.data.user);
+        redirectToDashboard(response.data.user.user_type || response.data.user.userType);
         return true;
       }
       return false;
@@ -97,6 +125,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       await supabaseService.logout();
+      navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -119,6 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     register,
     updateUser,
+    redirectToDashboard,
   };
 
   return (

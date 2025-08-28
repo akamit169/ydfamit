@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
+import { getUserDashboardPath, getUserDisplayName } from "../utils/authHelpers";
 import {
   ArrowRight,
   Users,
@@ -204,13 +205,13 @@ const Homepage = () => {
                 {isAuthenticated ? (
                   <>
                     <Link
-                      to={`/${user?.user_type || user?.userType}-dashboard`}
+                      to={getUserDashboardPath(user)}
                       className="text-white hover:text-ydf-golden-yellow transition-colors font-medium"
                     >
                       Dashboard
                     </Link>
                     <span className="text-ydf-golden-yellow text-sm">
-                      {user?.first_name || user?.firstName} {user?.last_name || user?.lastName}
+                      {getUserDisplayName(user)}
                     </span>
                     <button
                       onClick={() => logout()}

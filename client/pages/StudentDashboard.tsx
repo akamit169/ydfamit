@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useSupabaseQuery } from "../hooks/useSupabase";
 import { useAuth } from "../contexts/AuthContext";
 import OnboardingTour from "../components/OnboardingTour";
+import { getUserDisplayName, getWelcomeMessage } from "../utils/authHelpers";
 import {
   GraduationCap,
   FileText,
@@ -21,6 +22,7 @@ import {
 const StudentDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     // Check if user is new (hasn't seen onboarding)
@@ -134,7 +136,7 @@ const StudentDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
-                Good Morning, Arjun!
+                {getWelcomeMessage(user)}
               </h1>
               <p className="text-sm text-gray-600">
                 Ready to explore new opportunities?

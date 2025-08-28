@@ -11,6 +11,7 @@ import { Separator } from '../components/ui/separator';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import supabaseService from '../services/supabaseService';
 import DatabaseStatus from '../components/DatabaseStatus';
+import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -21,8 +22,15 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const navigate = useNavigate();
   const { t } = useTranslation();
+  const { login, register, isAuthenticated, redirectToDashboard } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      redirectToDashboard();
+    }
+  }, [isAuthenticated, redirectToDashboard]);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -80,11 +88,17 @@ export default function Auth() {
 
     try {
       if (mode === 'forgot-password') {
-        // TODO: Implement forgot password API
-        setSuccess('Password reset link has been sent to your email');
-        setTimeout(() => setMode('login'), 3000);
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        });
+        
+        if (error) {
+          setError(error.message);
+        } else {
+          setSuccess('Password reset link has been sent to your email');
+          setTimeout(() => setMode('login'), 3000);
+        }
       } else if (mode === 'signup') {
-        // Register new user
         const userData = {
           email: formData.email,
           password: formData.password,
@@ -95,60 +109,23 @@ export default function Auth() {
           profileData: {}
         };
 
-        const response = await apiService.register(userData);
-
-        if (response.success && response.data) {
+        const success = await register(userData);
+        if (success) {
           setSuccess('Account created successfully! Redirecting...');
-
-          // Navigate based on user type
-          setTimeout(() => {
-            switch (response.data!.user.user_type || response.data!.user.userType) {
-              case 'admin':
-                navigate('/admin-dashboard');
-                break;
-              case 'reviewer':
-                navigate('/reviewer-dashboard');
-                break;
-              case 'donor':
-                navigate('/donor-dashboard');
-                break;
-              default:
-                navigate('/student-dashboard');
-            }
-          }, 1500);
         } else {
-          setError(response.error || 'Registration failed');
+          setError('Registration failed. Please try again.');
         }
       } else {
-        // Login existing user
         const loginData = {
           email: formData.email,
           password: formData.password
         };
 
-        const response = await apiService.login(loginData);
-
-        if (response.success && response.data) {
+        const success = await login(formData.email, formData.password);
+        if (success) {
           setSuccess('Login successful! Redirecting...');
-
-          // Navigate based on user type
-          setTimeout(() => {
-            switch (response.data!.user.user_type || response.data!.user.userType) {
-              case 'admin':
-                navigate('/admin-dashboard');
-                break;
-              case 'reviewer':
-                navigate('/reviewer-dashboard');
-                break;
-              case 'donor':
-                navigate('/donor-dashboard');
-                break;
-              default:
-                navigate('/student-dashboard');
-            }
-          }, 1500);
         } else {
-          setError(response.error || 'Login failed');
+          setError('Login failed. Please check your credentials.');
         }
       }
     } catch (error) {
