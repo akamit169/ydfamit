@@ -263,33 +263,44 @@ class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User | null> {
     try {
+      // Check if Supabase is properly configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.error('Supabase environment variables not configured');
+        return null;
+      }
+
       // First check if we have an authenticated session
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return null;
 
-      // Try to get user profile with better error handling
+      // Try to get user profile - use maybeSingle() to handle 0 rows gracefully
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Get current user error:', error);
-        
-        // If it's a permission error, the user might not have a profile yet
-        if (error.code === '42501' || error.message.includes('permission denied')) {
-          console.log('Permission denied - user profile may not exist yet');
-          return null;
-        }
-        
+        return null;
+      }
+
+      // If no user profile found, return null (don't create here)
+      if (!userData) {
+        console.log('No user profile found for authenticated user');
         return null;
       }
 
       return userData;
     } catch (error) {
       console.error('Get current user exception:', error);
+      
+      // Handle network errors gracefully
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.error('Network error - Supabase connection failed');
+      }
+      
       return null;
     }
   }
