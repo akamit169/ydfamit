@@ -117,6 +117,7 @@ export default function Auth() {
         const result = await login(formData.email, formData.password);
         if (result.success) {
           setSuccess('Login successful! Redirecting...');
+          // Don't need additional redirect here as AuthContext handles it
         } else {
           setError(result.error || 'Login failed. Please check your credentials.');
         }

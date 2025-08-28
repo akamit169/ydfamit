@@ -83,9 +83,8 @@ const LoginDemo = () => {
     try {
       const result = await login(user.email, user.password);
       if (result.success) {
-        setTimeout(() => {
-          redirectToDashboard();
-        }, 1000);
+        console.log('Demo login successful for role:', user.role);
+        // AuthContext will handle redirection automatically
       } else {
         console.error('Demo login failed:', result.error);
       }

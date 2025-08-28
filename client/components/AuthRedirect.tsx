@@ -22,6 +22,7 @@ const AuthRedirect = ({ children }: AuthRedirectProps) => {
       const dashboardPath = `/${userType}-dashboard`;
       console.log('Redirecting authenticated user to:', dashboardPath);
       navigate(dashboardPath, { replace: true });
+      return;
     }
 
     // If user is not authenticated and trying to access protected routes

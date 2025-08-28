@@ -133,11 +133,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password
       });
 
       if (error) {
+        console.error('Login error:', error);
         return { success: false, error: error.message };
       }
 
@@ -150,10 +151,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single();
 
         if (userError) {
+          console.error('User profile error:', userError);
           return { success: false, error: 'Failed to load user profile' };
         }
 
+        console.log('Login successful, user role:', userData.user_type);
         setUser(userData);
+        
+        // Immediate redirection after successful login
+        setTimeout(() => {
+          redirectToDashboard(userData.user_type);
+        }, 100);
+        
         return { success: true };
       }
 
