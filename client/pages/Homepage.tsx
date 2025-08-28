@@ -230,6 +230,12 @@ const Homepage = () => {
                       <span>Sign In</span>
                     </Link>
                     <Link
+                      to="/demo"
+                      className="text-white hover:text-ydf-golden-yellow transition-colors font-medium text-sm"
+                    >
+                      Demo
+                    </Link>
+                    <Link
                       to="/auth"
                       className="bg-ydf-golden-yellow text-ydf-deep-blue px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors font-semibold flex items-center space-x-1"
                     >
@@ -284,6 +290,13 @@ const Homepage = () => {
                   >
                     <LogIn className="h-4 w-4" />
                     <span>Sign In</span>
+                  </Link>
+                  <Link
+                    to="/demo"
+                    className="text-white hover:text-ydf-golden-yellow py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Try Demo
                   </Link>
                   <Link
                     to="/auth"

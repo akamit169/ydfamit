@@ -1,0 +1,345 @@
+import { supabase } from '../lib/supabase';
+import { User, CreateUserInput, LoginInput } from '../../shared/types/database';
+
+export interface AuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+  message?: string;
+}
+
+class AuthService {
+  // Login with email and password
+  async login(email: string, password: string): Promise<AuthResult> {
+    try {
+      console.log('Attempting login for:', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
+
+      if (error) {
+        console.error('Login error:', error);
+        return { 
+          success: false, 
+          error: this.getReadableError(error.message) 
+        };
+      }
+
+      if (!data.user) {
+        return { 
+          success: false, 
+          error: 'Login failed - no user data received' 
+        };
+      }
+
+      // Get user profile from our users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (userError) {
+        console.error('User profile error:', userError);
+        return { 
+          success: false, 
+          error: 'Failed to load user profile' 
+        };
+      }
+
+      console.log('Login successful for user:', userData.email, 'Role:', userData.user_type);
+      
+      return {
+        success: true,
+        user: userData,
+        message: 'Login successful'
+      };
+    } catch (error) {
+      console.error('Login exception:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Login failed'
+      };
+    }
+  }
+
+  // Register new user
+  async register(userData: CreateUserInput): Promise<AuthResult> {
+    try {
+      console.log('Attempting registration for:', userData.email);
+
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email.trim().toLowerCase(),
+        password: userData.password,
+        options: {
+          data: {
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            user_type: userData.userType,
+            phone: userData.phone
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Auth registration error:', authError);
+        return { 
+          success: false, 
+          error: this.getReadableError(authError.message) 
+        };
+      }
+
+      if (!authData.user) {
+        return { 
+          success: false, 
+          error: 'Registration failed - no user created' 
+        };
+      }
+
+      // Create user profile in our users table
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          email: userData.email.trim().toLowerCase(),
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          phone: userData.phone,
+          user_type: userData.userType,
+          profile_data: userData.profileData || {},
+          email_verified: false,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        // Clean up auth user if profile creation fails
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        return { 
+          success: false, 
+          error: 'Failed to create user profile' 
+        };
+      }
+
+      console.log('Registration successful for user:', profileData.email, 'Role:', profileData.user_type);
+
+      return {
+        success: true,
+        user: profileData,
+        message: 'Account created successfully'
+      };
+    } catch (error) {
+      console.error('Registration exception:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Registration failed'
+      };
+    }
+  }
+
+  // Logout user
+  async logout(): Promise<AuthResult> {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        return { 
+          success: false, 
+          error: error.message 
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Logout successful'
+      };
+    } catch (error) {
+      console.error('Logout error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Logout failed'
+      };
+    }
+  }
+
+  // Get current user
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return null;
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Get current user error:', error);
+        return null;
+      }
+
+      return userData;
+    } catch (error) {
+      console.error('Get current user exception:', error);
+      return null;
+    }
+  }
+
+  // Update user profile
+  async updateProfile(userId: string, profileData: Partial<User>): Promise<AuthResult> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          phone: profileData.phone,
+          profile_data: profileData.profile_data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        return { 
+          success: false, 
+          error: error.message 
+        };
+      }
+
+      return {
+        success: true,
+        user: data,
+        message: 'Profile updated successfully'
+      };
+    } catch (error) {
+      console.error('Update profile error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Update failed'
+      };
+    }
+  }
+
+  // Check if user is authenticated
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return !!session?.user;
+    } catch (error) {
+      console.error('Auth check error:', error);
+      return false;
+    }
+  }
+
+  // Get user role
+  getUserRole(user: User | null): string {
+    return user?.user_type || 'student';
+  }
+
+  // Check if user has specific role
+  hasRole(user: User | null, role: string): boolean {
+    return this.getUserRole(user) === role;
+  }
+
+  // Check if user has any of the specified roles
+  hasAnyRole(user: User | null, roles: string[]): boolean {
+    const userRole = this.getUserRole(user);
+    return roles.includes(userRole);
+  }
+
+  // Get dashboard path for user role
+  getDashboardPath(user: User | null): string {
+    const role = this.getUserRole(user);
+    switch (role) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'reviewer':
+        return '/reviewer-dashboard';
+      case 'donor':
+        return '/donor-dashboard';
+      case 'student':
+      default:
+        return '/student-dashboard';
+    }
+  }
+
+  // Convert Supabase errors to user-friendly messages
+  private getReadableError(errorMessage: string): string {
+    if (errorMessage.includes('Invalid login credentials')) {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    if (errorMessage.includes('Email not confirmed')) {
+      return 'Please check your email and click the confirmation link before signing in.';
+    }
+    if (errorMessage.includes('User already registered')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    if (errorMessage.includes('Password should be at least')) {
+      return 'Password must be at least 6 characters long.';
+    }
+    if (errorMessage.includes('Unable to validate email address')) {
+      return 'Please enter a valid email address.';
+    }
+    
+    return errorMessage;
+  }
+
+  // Create demo users (for development)
+  async createDemoUsers(): Promise<void> {
+    const demoUsers = [
+      {
+        email: 'student@demo.com',
+        password: 'student123',
+        firstName: 'Demo',
+        lastName: 'Student',
+        userType: 'student' as const,
+        phone: '+91 9876543210'
+      },
+      {
+        email: 'admin@demo.com',
+        password: 'admin123',
+        firstName: 'Demo',
+        lastName: 'Admin',
+        userType: 'admin' as const,
+        phone: '+91 9876543211'
+      },
+      {
+        email: 'reviewer@demo.com',
+        password: 'reviewer123',
+        firstName: 'Demo',
+        lastName: 'Reviewer',
+        userType: 'reviewer' as const,
+        phone: '+91 9876543212'
+      },
+      {
+        email: 'donor@demo.com',
+        password: 'donor123',
+        firstName: 'Demo',
+        lastName: 'Donor',
+        userType: 'donor' as const,
+        phone: '+91 9876543213'
+      }
+    ];
+
+    for (const user of demoUsers) {
+      try {
+        await this.register(user);
+        console.log(`Created demo user: ${user.email}`);
+      } catch (error) {
+        console.log(`Demo user ${user.email} might already exist`);
+      }
+    }
+  }
+}
+
+export const authService = new AuthService();
+export default authService;

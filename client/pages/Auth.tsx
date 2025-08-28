@@ -1,19 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Chrome, Linkedin } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Chrome, Linkedin, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import supabaseService from '../services/supabaseService';
 import DatabaseStatus from '../components/DatabaseStatus';
 import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
+
+// Demo credentials for testing
+const DEMO_CREDENTIALS = {
+  student: { email: 'student@demo.com', password: 'student123' },
+  admin: { email: 'admin@demo.com', password: 'admin123' },
+  reviewer: { email: 'reviewer@demo.com', password: 'reviewer123' },
+  donor: { email: 'donor@demo.com', password: 'donor123' }
+};
 
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -22,15 +28,8 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { t } = useTranslation();
   const { login, register, isAuthenticated, redirectToDashboard } = useAuth();
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      redirectToDashboard();
-    }
-  }, [isAuthenticated, redirectToDashboard]);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -41,6 +40,13 @@ export default function Auth() {
     phone: '',
     userType: 'student'
   });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      redirectToDashboard();
+    }
+  }, [isAuthenticated, redirectToDashboard]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -61,8 +67,8 @@ export default function Auth() {
         setError('Please enter your full name');
         return false;
       }
-      if (!formData.password || formData.password.length < 8) {
-        setError('Password must be at least 8 characters long');
+      if (!formData.password || formData.password.length < 6) {
+        setError('Password must be at least 6 characters long');
         return false;
       }
       if (formData.password !== formData.confirmPassword) {
@@ -88,16 +94,8 @@ export default function Auth() {
 
     try {
       if (mode === 'forgot-password') {
-        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
-        });
-        
-        if (error) {
-          setError(error.message);
-        } else {
-          setSuccess('Password reset link has been sent to your email');
-          setTimeout(() => setMode('login'), 3000);
-        }
+        // Handle password reset
+        setSuccess('Password reset functionality will be available soon');
       } else if (mode === 'signup') {
         const userData = {
           email: formData.email,
@@ -109,38 +107,54 @@ export default function Auth() {
           profileData: {}
         };
 
-        const success = await register(userData);
-        if (success) {
+        const result = await register(userData);
+        if (result.success) {
           setSuccess('Account created successfully! Redirecting...');
+          setTimeout(() => {
+            redirectToDashboard(userData.userType);
+          }, 1500);
         } else {
-          setError('Registration failed. Please try again.');
+          setError(result.error || 'Registration failed. Please try again.');
         }
       } else {
-        const loginData = {
-          email: formData.email,
-          password: formData.password
-        };
-
-        const success = await login(formData.email, formData.password);
-        if (success) {
+        const result = await login(formData.email, formData.password);
+        if (result.success) {
           setSuccess('Login successful! Redirecting...');
         } else {
-          setError('Login failed. Please check your credentials.');
+          setError(result.error || 'Login failed. Please check your credentials.');
         }
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDemoLogin = async (role: keyof typeof DEMO_CREDENTIALS) => {
+    const credentials = DEMO_CREDENTIALS[role];
+    setFormData(prev => ({
+      ...prev,
+      email: credentials.email,
+      password: credentials.password
+    }));
+    
+    setIsLoading(true);
+    const result = await login(credentials.email, credentials.password);
+    
+    if (result.success) {
+      setSuccess(`Demo ${role} login successful! Redirecting...`);
+    } else {
+      setError(result.error || 'Demo login failed');
+    }
+    setIsLoading(false);
   };
 
   const handleSocialAuth = (provider: string) => {
     setError('');
     setIsLoading(true);
     
-    // Simulate social auth
     setTimeout(() => {
       setError(`${provider} authentication will be available soon`);
       setIsLoading(false);
@@ -148,13 +162,14 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
+        {/* Logo and Title */}
         <div className="mb-6 text-center">
           <img
             src="https://cdn.builder.io/api/v1/image/assets%2F3b1b952ac06b422687ab6f8265e647a7%2F209099442e6c42e883b3d324b2f06354?format=webp&width=800"
@@ -171,10 +186,47 @@ export default function Auth() {
           </p>
         </div>
 
+        {/* Database Status */}
         <div className="mb-4">
           <DatabaseStatus />
         </div>
 
+        {/* Demo Credentials */}
+        {mode === 'login' && (
+          <Card className="mb-4 border-blue-200 bg-blue-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-blue-800">Demo Credentials</CardTitle>
+              <CardDescription className="text-xs text-blue-600">
+                Click any role below to login with demo credentials
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(DEMO_CREDENTIALS).map(([role, creds]) => (
+                  <Button
+                    key={role}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDemoLogin(role as keyof typeof DEMO_CREDENTIALS)}
+                    disabled={isLoading}
+                    className="text-xs capitalize border-blue-300 text-blue-700 hover:bg-blue-100"
+                  >
+                    {role}
+                  </Button>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-blue-600">
+                <p><strong>Student:</strong> {DEMO_CREDENTIALS.student.email}</p>
+                <p><strong>Admin:</strong> {DEMO_CREDENTIALS.admin.email}</p>
+                <p><strong>Reviewer:</strong> {DEMO_CREDENTIALS.reviewer.email}</p>
+                <p><strong>Donor:</strong> {DEMO_CREDENTIALS.donor.email}</p>
+                <p className="mt-1 text-blue-500">Password for all: respective role + "123"</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Auth Card */}
         <Card>
           <CardHeader className="space-y-1">
             <div className="flex items-center space-x-2">
@@ -204,12 +256,14 @@ export default function Auth() {
           <CardContent className="space-y-4">
             {error && (
               <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
 
             {success && (
               <Alert className="border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700">{success}</AlertDescription>
               </Alert>
             )}
@@ -309,12 +363,12 @@ export default function Auth() {
                       name="userType"
                       value={formData.userType}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="student">Student</option>
-                      <option value="admin">Administrator</option>
-                      <option value="reviewer">Reviewer</option>
-                      <option value="donor">Donor</option>
+                      <option value="student">Student - Apply for scholarships</option>
+                      <option value="admin">Administrator - Manage programs</option>
+                      <option value="reviewer">Reviewer - Evaluate applications</option>
+                      <option value="donor">Donor - Fund education</option>
                     </select>
                   </div>
                 </>
