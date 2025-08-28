@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
-import supabaseService from '../services/supabaseService';
+import { supabase } from '../lib/supabase';
 
 export const DatabaseStatus = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
