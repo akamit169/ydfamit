@@ -55,11 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(result.user);
         
         // Immediate redirection after successful login
-        setTimeout(() => {
-          const dashboardPath = authService.getDashboardPath(result.user);
-          console.log(`Login successful, redirecting to: ${dashboardPath}`);
-          navigate(dashboardPath, { replace: true });
-        }, 100);
+        const dashboardPath = authService.getDashboardPath(result.user);
+        console.log(`Login successful, redirecting to: ${dashboardPath}`);
+        navigate(dashboardPath, { replace: true });
         
         return { success: true };
       } else {
@@ -85,11 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(result.user);
         
         // Immediate redirection after successful registration
-        setTimeout(() => {
-          const dashboardPath = authService.getDashboardPath(result.user);
-          console.log(`Registration successful, redirecting to: ${dashboardPath}`);
-          navigate(dashboardPath, { replace: true });
-        }, 100);
+        const dashboardPath = authService.getDashboardPath(result.user);
+        console.log(`Registration successful, redirecting to: ${dashboardPath}`);
+        navigate(dashboardPath, { replace: true });
         
         return { success: true };
       } else {

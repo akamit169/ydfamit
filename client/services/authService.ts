@@ -326,7 +326,7 @@ class AuthService {
   // Convert Supabase errors to user-friendly messages
   private getReadableError(errorMessage: string): string {
     if (errorMessage.includes('Invalid login credentials')) {
-      return 'Invalid email or password. Make sure you have created the demo users first by clicking "Create Demo Users" button.';
+      return 'Invalid email or password. Please make sure you have created the demo users first by clicking "Create Demo Users" button.';
     }
     if (errorMessage.includes('Email not confirmed')) {
       return 'Please check your email and click the confirmation link before signing in.';

@@ -7,27 +7,35 @@ import authService from '../services/authService';
 
 export default function DemoSetup() {
   const [isCreating, setIsCreating] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({ type: null, message: '' });
 
   const handleCreateDemoUsers = async () => {
     setIsCreating(true);
-    setStatus('idle');
-    setMessage('');
+    setStatus({ type: null, message: '' });
 
     try {
       const result = await authService.createDemoUsers();
       
       if (result.success) {
-        setStatus('success');
-        setMessage(result.message || 'Demo users created successfully!');
+        setStatus({
+          type: 'success',
+          message: result.message || 'Demo users created successfully!'
+        });
       } else {
-        setStatus('error');
-        setMessage(result.error || 'Failed to create demo users');
+        setStatus({
+          type: 'error',
+          message: result.error || 'Failed to create demo users'
+        });
       }
     } catch (error) {
-      setStatus('error');
-      setMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+      console.error('Demo setup error:', error);
+      setStatus({
+        type: 'error',
+        message: 'An unexpected error occurred while creating demo users'
+      });
     } finally {
       setIsCreating(false);
     }
@@ -45,20 +53,15 @@ export default function DemoSetup() {
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        {status === 'success' && (
-          <Alert className="border-green-200 bg-green-50">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-700 text-xs">
-              {message}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {status === 'error' && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-700 text-xs">
-              {message}
+        {status.type && (
+          <Alert className={status.type === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+            {status.type === 'success' ? (
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            )}
+            <AlertDescription className={status.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+              {status.message}
             </AlertDescription>
           </Alert>
         )}
@@ -66,8 +69,8 @@ export default function DemoSetup() {
         <Button
           onClick={handleCreateDemoUsers}
           disabled={isCreating}
-          size="sm"
           className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          size="sm"
         >
           {isCreating ? (
             <>
@@ -83,13 +86,14 @@ export default function DemoSetup() {
         </Button>
 
         <div className="text-xs text-blue-600 space-y-1">
-          <p><strong>This will create:</strong></p>
-          <ul className="list-disc list-inside space-y-0.5 ml-2">
-            <li>student@demo.com (password: student123)</li>
-            <li>admin@demo.com (password: admin123)</li>
-            <li>reviewer@demo.com (password: reviewer123)</li>
-            <li>donor@demo.com (password: donor123)</li>
-          </ul>
+          <p><strong>This will create 4 demo accounts:</strong></p>
+          <div className="grid grid-cols-2 gap-1 text-xs">
+            <div>• Student: student@demo.com</div>
+            <div>• Admin: admin@demo.com</div>
+            <div>• Reviewer: reviewer@demo.com</div>
+            <div>• Donor: donor@demo.com</div>
+          </div>
+          <p className="text-blue-500 mt-2">Password for all: [role]123 (e.g., student123)</p>
         </div>
       </CardContent>
     </Card>
