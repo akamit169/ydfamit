@@ -3,29 +3,32 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Create a default client even if env vars are missing to prevent app crashes
-const defaultUrl = 'https://placeholder.supabase.co';
-const defaultKey = 'placeholder-key';
+// Check if Supabase is properly configured
+export const isSupabaseConfigured = !!(
+  supabaseUrl && 
+  supabaseAnonKey && 
+  supabaseUrl.includes('supabase.co') &&
+  supabaseUrl !== 'https://your-project.supabase.co' &&
+  supabaseAnonKey !== 'your-anon-key'
+);
 
+// Create Supabase client with fallback values to prevent crashes
 export const supabase = createClient(
-  supabaseUrl || defaultUrl, 
-  supabaseAnonKey || defaultKey, 
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key',
   {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  },
-  // Add global options to handle connection issues gracefully
-  global: {
-    headers: {
-      'X-Client-Info': 'youth-dreamers-foundation'
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'youth-dreamers-foundation'
+      }
     }
   }
-});
-
-// Export connection status
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl.includes('supabase.co'));
+);
 
 // Database types (generated from Supabase)
 export type Database = {

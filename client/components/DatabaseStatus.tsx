@@ -2,32 +2,31 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 export const DatabaseStatus = () => {
-  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'not-configured' | 'error'>('checking');
-  const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'not-configured'>('checking');
 
   useEffect(() => {
     const checkConnection = () => {
       try {
-        if (isSupabaseConfigured) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (supabaseUrl && supabaseKey && supabaseUrl.includes('supabase.co')) {
           setConnectionStatus('connected');
         } else {
           setConnectionStatus('not-configured');
         }
       } catch (error) {
         console.error('Connection check error:', error);
-        setConnectionStatus('error');
-      } finally {
-        setIsLoading(false);
+        setConnectionStatus('not-configured');
       }
     };
 
     checkConnection();
   }, []);
 
-  if (isLoading) {
+  if (connectionStatus === 'checking') {
     return (
       <Alert className="border-blue-200 bg-blue-50">
         <Database className="h-4 w-4 text-blue-600" />

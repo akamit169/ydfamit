@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import authService from '../services/authService';
 import { User, CreateUserInput } from '../../shared/types/database';
 
@@ -26,6 +26,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
+      // Skip auth initialization if Supabase is not configured
+      if (!isSupabaseConfigured) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         // Check if we have a session first
         const { data: { session } } = await supabase.auth.getSession();
